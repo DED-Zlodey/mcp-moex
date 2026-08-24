@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/MoexMcp.Application/MoexMcp.Application.csproj" />
+    <Project Path="src/MoexMcp.Domain/MoexMcp.Domain.csproj" />
+    <Project Path="src/MoexMcp.Host/MoexMcp.Host.csproj" />
+    <Project Path="src/MoexMcp.Infrastructure/MoexMcp.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/MoexMcp.Tests/MoexMcp.Tests.csproj" />
+  </Folder>
+</Solution>

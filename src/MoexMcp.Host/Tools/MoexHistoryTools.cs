@@ -1,0 +1,69 @@
+using System.ComponentModel;
+using System.Text;
+using MoexMcp.Application.Services;
+using ModelContextProtocol.Server;
+
+namespace MoexMcp.Host.Tools;
+
+/// <summary>Исторические данные MOEX: свечи и дневная история.</summary>
+[McpServerToolType]
+public class MoexHistoryTools
+{
+    private readonly IHistoryService _history;
+
+    public MoexHistoryTools(IHistoryService history)
+    {
+        _history = history;
+    }
+
+    [McpServerTool(Name = "get_candles"), Description("Получить OHLC-свечи акции: открытие, закрытие, максимум, минимум, объём")]
+    public async Task<string> GetCandles(
+        [Description("Тикер акции (например SBER)")] string ticker,
+        [Description("Интервал свечи в минутах: 1, 10, 60 (час) или 24 (день). По умолчанию 60")] int interval = 60,
+        [Description("Начало периода, yyyy-MM-dd. По умолчанию 7 дней назад")] string? from = null,
+        [Description("Конец периода, yyyy-MM-dd. По умолчанию сегодня")] string? to = null,
+        CancellationToken ct = default)
+    {
+        var fromDate = Format.ParseDate(from, DateTime.Today.AddDays(-7));
+        var toDate = Format.ParseDate(to, DateTime.Today);
+
+        IReadOnlyList<MoexMcp.Domain.Models.Candle> candles;
+        try
+        {
+            candles = await _history.GetCandlesAsync(ticker, interval, fromDate, toDate, ct);
+        }
+        catch (ArgumentException ex)
+        {
+            return ex.Message;
+        }
+
+        if (candles.Count == 0)
+            return $"Свечей по {ticker} за {fromDate:dd.MM.yyyy}—{toDate:dd.MM.yyyy} не найдено.";
+
+        var sb = new StringBuilder($"Свечи {ticker.ToUpperInvariant()}, интервал {interval} мин, {fromDate:dd.MM.yyyy}—{toDate:dd.MM.yyyy} ({candles.Count} шт.):\n");
+        sb.AppendLine("Время | O | C | H | L | Объём");
+        foreach (var c in candles)
+            sb.AppendLine($"{c.Begin:dd.MM HH:mm} | {c.Open:0.00} | {c.Close:0.00} | {c.High:0.00} | {c.Low:0.00} | {c.Volume}");
+        return sb.ToString();
+    }
+
+    [McpServerTool(Name = "get_price_history"), Description("Получить дневные цены закрытия акции за период")]
+    public async Task<string> GetPriceHistory(
+        [Description("Тикер акции (например SBER)")] string ticker,
+        [Description("Начало периода, yyyy-MM-dd. По умолчанию 30 дней назад")] string? from = null,
+        [Description("Конец периода, yyyy-MM-dd. По умолчанию сегодня")] string? to = null,
+        CancellationToken ct = default)
+    {
+        var fromDate = Format.ParseDate(from, DateTime.Today.AddDays(-30));
+        var toDate = Format.ParseDate(to, DateTime.Today);
+
+        var prices = await _history.GetPriceHistoryAsync(ticker, fromDate, toDate, ct);
+        if (prices.Count == 0)
+            return $"Истории по {ticker} за {fromDate:dd.MM.yyyy}—{toDate:dd.MM.yyyy} не найдено.";
+
+        var sb = new StringBuilder($"История закрытий {ticker.ToUpperInvariant()}, {fromDate:dd.MM.yyyy}—{toDate:dd.MM.yyyy} ({prices.Count} дней):\n");
+        foreach (var p in prices)
+            sb.AppendLine($"{p.Date:dd.MM.yyyy}: {p.Close:0.00} ₽");
+        return sb.ToString();
+    }
+}
