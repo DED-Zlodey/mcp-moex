@@ -51,4 +51,35 @@ public class HistoryServiceTests
 
         Assert.Equal(1, moex.HistoryCalls);
     }
+
+    [Fact]
+    public async Task CacheKeys_IncludeAssetClass()
+    {
+        var moex = new FakeMoexRepository
+        {
+            History = [new DailyPrice("X", new DateTime(2026, 8, 21), 100m)]
+        };
+        var service = new HistoryService(moex, new FakeCacheRepository());
+        var from = new DateTime(2026, 8, 1);
+        var to = new DateTime(2026, 8, 21);
+
+        await service.GetPriceHistoryAsync("X", from, to);                          // share
+        await service.GetPriceHistoryAsync("X", from, to);                          // share — из кэша
+        await service.GetPriceHistoryAsync("X", from, to, AssetClass.Bond);         // bond — другой ключ
+
+        Assert.Equal(2, moex.HistoryCalls);
+    }
+
+    [Fact]
+    public async Task AssetClass_IsPassedToRepository()
+    {
+        var moex = new FakeMoexRepository();
+        var service = new HistoryService(moex, new FakeCacheRepository());
+
+        await service.GetCandlesAsync("SU26243RMFS4", 60, DateTime.Today.AddDays(-1), DateTime.Today, AssetClass.Bond);
+        await service.GetPriceHistoryAsync("GLDRUB_TOM", DateTime.Today.AddDays(-1), DateTime.Today, AssetClass.Metal);
+
+        Assert.Equal(AssetClass.Bond, moex.LastCandlesAssetClass);
+        Assert.Equal(AssetClass.Metal, moex.LastHistoryAssetClass);
+    }
 }

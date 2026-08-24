@@ -137,4 +137,58 @@ public class ComparisonServiceTests
         Assert.Equal(5, rank.Count);
         Assert.Equal("T30", rank[0].Ticker); // максимальная доходность
     }
+
+    [Fact]
+    public async Task Rank_FiltersByAssetClass()
+    {
+        var snapshots = new FakeSnapshotRepository();
+        snapshots.Add(new MarketSnapshot(From, [
+            TestData.Quote("SBER", 100, 0, From),
+            TestData.Quote("OFZ", 70, 0, From, AssetClass.Bond),
+        ]));
+        snapshots.Add(new MarketSnapshot(To, [
+            TestData.Quote("SBER", 120, 1, To),  // +20%
+            TestData.Quote("OFZ", 71, 1, To, AssetClass.Bond), // +1.43%
+        ]));
+        var service = new ComparisonService(new FakeMoexRepository(), snapshots);
+
+        var bonds = await service.RankByPerformanceAsync(From, To, 10, AssetClass.Bond);
+        var shares = await service.RankByPerformanceAsync(From, To, 10);
+
+        var bond = Assert.Single(bonds!);
+        Assert.Equal("OFZ", bond.Ticker);
+        Assert.Equal(AssetClass.Bond, bond.Class);
+        var share = Assert.Single(shares!);
+        Assert.Equal("SBER", share.Ticker);
+    }
+
+    [Fact]
+    public async Task Compare_Bond_PassesAssetClassToHistoryAndResult()
+    {
+        var moex = new FakeMoexRepository
+        {
+            History = [new DailyPrice("OFZ", new DateTime(2026, 8, 15), 70m)]
+        };
+        var service = new ComparisonService(moex, new FakeSnapshotRepository());
+
+        var result = await service.CompareInstrumentsAsync(["OFZ"], From, To, AssetClass.Bond);
+
+        var item = Assert.Single(result);
+        Assert.Equal(AssetClass.Bond, item.Class);
+        Assert.Equal(AssetClass.Bond, moex.LastHistoryAssetClass);
+    }
+
+    [Fact]
+    public async Task Compare_Bond_DoesNotMatchShareQuotesFromSnapshot()
+    {
+        // В снапшоте есть акция с таким тикером, но compare вызван для облигаций — совпадения нет
+        var snapshots = new FakeSnapshotRepository();
+        snapshots.Add(new MarketSnapshot(From, [TestData.Quote("X", 100, 0, From)]));
+        snapshots.Add(new MarketSnapshot(To, [TestData.Quote("X", 110, 1, To)]));
+        var service = new ComparisonService(new FakeMoexRepository(), snapshots);
+
+        var result = await service.CompareInstrumentsAsync(["X"], From, To, AssetClass.Bond);
+
+        Assert.Empty(result); // истории тоже нет — тикер пропущен
+    }
 }

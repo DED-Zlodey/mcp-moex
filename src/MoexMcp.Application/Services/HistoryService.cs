@@ -19,29 +19,30 @@ public class HistoryService : IHistoryService
         _cache = cache;
     }
 
-    public async Task<IReadOnlyList<Candle>> GetCandlesAsync(string ticker, int intervalMinutes, DateTime from, DateTime to, CancellationToken ct = default)
+    public async Task<IReadOnlyList<Candle>> GetCandlesAsync(string ticker, int intervalMinutes, DateTime from, DateTime to, AssetClass assetClass = AssetClass.Share, CancellationToken ct = default)
     {
         if (!AllowedIntervals.Contains(intervalMinutes))
             throw new ArgumentException($"Интервал {intervalMinutes} не поддерживается. Допустимые: 1, 10, 60, 24.", nameof(intervalMinutes));
 
-        var key = $"candles:{ticker.ToUpperInvariant()}:{intervalMinutes}:{from:yyyyMMdd}:{to:yyyyMMdd}";
+        // Класс актива в ключе — чтобы кэш свечей акции и облигации с одним тикером не пересекался
+        var key = $"candles:{assetClass.ToString().ToLowerInvariant()}:{ticker.ToUpperInvariant()}:{intervalMinutes}:{from:yyyyMMdd}:{to:yyyyMMdd}";
         var cached = await _cache.GetAsync<List<Candle>>(key);
         if (cached is not null)
             return cached;
 
-        var fresh = await _moex.GetCandlesAsync(ticker.ToUpperInvariant(), intervalMinutes, from, to, ct);
+        var fresh = await _moex.GetCandlesAsync(ticker.ToUpperInvariant(), intervalMinutes, from, to, assetClass, ct);
         await _cache.SetAsync(key, fresh.ToList(), CandlesTtl);
         return fresh;
     }
 
-    public async Task<IReadOnlyList<DailyPrice>> GetPriceHistoryAsync(string ticker, DateTime from, DateTime to, CancellationToken ct = default)
+    public async Task<IReadOnlyList<DailyPrice>> GetPriceHistoryAsync(string ticker, DateTime from, DateTime to, AssetClass assetClass = AssetClass.Share, CancellationToken ct = default)
     {
-        var key = $"history:{ticker.ToUpperInvariant()}:{from:yyyyMMdd}:{to:yyyyMMdd}";
+        var key = $"history:{assetClass.ToString().ToLowerInvariant()}:{ticker.ToUpperInvariant()}:{from:yyyyMMdd}:{to:yyyyMMdd}";
         var cached = await _cache.GetAsync<List<DailyPrice>>(key);
         if (cached is not null)
             return cached;
 
-        var fresh = await _moex.GetPriceHistoryAsync(ticker.ToUpperInvariant(), from, to, ct);
+        var fresh = await _moex.GetPriceHistoryAsync(ticker.ToUpperInvariant(), from, to, assetClass, ct);
         await _cache.SetAsync(key, fresh.ToList(), HistoryTtl);
         return fresh;
     }

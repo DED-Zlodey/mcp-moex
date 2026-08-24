@@ -7,18 +7,44 @@ namespace MoexMcp.Tests.Application;
 internal class FakeMoexRepository : IMoexRepository
 {
     public IReadOnlyList<Quote> AllQuotes { get; set; } = [];
+    public IReadOnlyList<Quote> AllBondQuotes { get; set; } = [];
+    public IReadOnlyList<MetalPrice> MetalPrices { get; set; } = [];
     public IReadOnlyList<DailyPrice> History { get; set; } = [];
     public IReadOnlyList<Candle> Candles { get; set; } = [];
     public int AllQuotesCalls { get; private set; }
+    public int AllBondsCalls { get; private set; }
+    public int MetalsCalls { get; private set; }
+    public int BondQuoteCalls { get; private set; }
     public int HistoryCalls { get; private set; }
+    public int CandlesCalls { get; private set; }
+    public AssetClass? LastHistoryAssetClass { get; private set; }
+    public AssetClass? LastCandlesAssetClass { get; private set; }
 
-    public Task<Quote?> GetQuoteAsync(string ticker, CancellationToken ct = default) =>
+    public Task<Quote?> GetQuoteAsync(string ticker, AssetClass assetClass = AssetClass.Share, CancellationToken ct = default) =>
         Task.FromResult(AllQuotes.FirstOrDefault(q => q.Ticker == ticker));
+
+    public Task<Quote?> GetBondQuoteAsync(string ticker, CancellationToken ct = default)
+    {
+        BondQuoteCalls++;
+        return Task.FromResult(AllBondQuotes.FirstOrDefault(q => q.Ticker == ticker));
+    }
 
     public Task<IReadOnlyList<Quote>> GetAllShareQuotesAsync(CancellationToken ct = default)
     {
         AllQuotesCalls++;
         return Task.FromResult(AllQuotes);
+    }
+
+    public Task<IReadOnlyList<Quote>> GetAllBondQuotesAsync(CancellationToken ct = default)
+    {
+        AllBondsCalls++;
+        return Task.FromResult(AllBondQuotes);
+    }
+
+    public Task<IReadOnlyList<MetalPrice>> GetMetalPricesAsync(CancellationToken ct = default)
+    {
+        MetalsCalls++;
+        return Task.FromResult(MetalPrices);
     }
 
     public Task<IReadOnlyList<SecurityInfo>> SearchSecuritiesAsync(string query, int limit = 20, CancellationToken ct = default) =>
@@ -27,12 +53,17 @@ internal class FakeMoexRepository : IMoexRepository
     public Task<IReadOnlyList<SiteNewsItem>> GetSiteNewsAsync(int limit = 20, CancellationToken ct = default) =>
         Task.FromResult<IReadOnlyList<SiteNewsItem>>([]);
 
-    public Task<IReadOnlyList<Candle>> GetCandlesAsync(string ticker, int intervalMinutes, DateTime from, DateTime to, CancellationToken ct = default) =>
-        Task.FromResult(Candles);
+    public Task<IReadOnlyList<Candle>> GetCandlesAsync(string ticker, int intervalMinutes, DateTime from, DateTime to, AssetClass assetClass = AssetClass.Share, CancellationToken ct = default)
+    {
+        CandlesCalls++;
+        LastCandlesAssetClass = assetClass;
+        return Task.FromResult(Candles);
+    }
 
-    public Task<IReadOnlyList<DailyPrice>> GetPriceHistoryAsync(string ticker, DateTime from, DateTime to, CancellationToken ct = default)
+    public Task<IReadOnlyList<DailyPrice>> GetPriceHistoryAsync(string ticker, DateTime from, DateTime to, AssetClass assetClass = AssetClass.Share, CancellationToken ct = default)
     {
         HistoryCalls++;
+        LastHistoryAssetClass = assetClass;
         return Task.FromResult(History);
     }
 
@@ -69,6 +100,7 @@ internal class FakeSnapshotRepository : ISnapshotRepository
 {
     private readonly List<MarketSnapshot> _snapshots = [];
     public int SavedCount => _snapshots.Count;
+    public MarketSnapshot? Last => _snapshots.LastOrDefault();
 
     public void Add(MarketSnapshot snapshot) => _snapshots.Add(snapshot);
 
@@ -91,6 +123,6 @@ internal class FakeSnapshotRepository : ISnapshotRepository
 
 internal static class TestData
 {
-    public static Quote Quote(string ticker, decimal? price, decimal? changePercent, DateTime? time = null) =>
-        new(ticker, $"Name {ticker}", price, null, changePercent, 1000, time ?? new DateTime(2026, 8, 21, 10, 0, 0));
+    public static Quote Quote(string ticker, decimal? price, decimal? changePercent, DateTime? time = null, AssetClass assetClass = AssetClass.Share) =>
+        new(ticker, $"Name {ticker}", price, null, changePercent, 1000, time ?? new DateTime(2026, 8, 21, 10, 0, 0), assetClass, assetClass.PriceUnit());
 }

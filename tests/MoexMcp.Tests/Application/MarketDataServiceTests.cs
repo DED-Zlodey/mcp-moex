@@ -78,4 +78,60 @@ public class MarketDataServiceTests
 
         Assert.Equal(1, moex.AllQuotesCalls); // второй вызов ушёл в кэш
     }
+
+    [Fact]
+    public async Task BondInfo_IsCached()
+    {
+        var moex = new FakeMoexRepository
+        {
+            AllBondQuotes = [TestData.Quote("SU26243RMFS4", 70, 0.1m, assetClass: AssetClass.Bond)]
+        };
+        var service = Service(moex, new FakeCacheRepository());
+
+        var first = await service.GetBondInfoAsync("SU26243RMFS4");
+        var second = await service.GetBondInfoAsync("SU26243RMFS4");
+
+        Assert.NotNull(first);
+        Assert.NotNull(second);
+        Assert.Equal(1, moex.BondQuoteCalls); // второй вызов ушёл в кэш
+    }
+
+    [Fact]
+    public async Task MetalPrices_AreCached()
+    {
+        var moex = new FakeMoexRepository
+        {
+            MetalPrices = [new MetalPrice("GLDRUB_TOM", "Золото", 12000, 5, new DateTime(2026, 8, 21, 10, 0, 0))]
+        };
+        var service = Service(moex, new FakeCacheRepository());
+
+        await service.GetMetalPricesAsync();
+        var metals = await service.GetMetalPricesAsync();
+
+        Assert.Single(metals);
+        Assert.Equal(1, moex.MetalsCalls);
+    }
+
+    [Fact]
+    public async Task TopBondGainers_SortedDescAndLimited()
+    {
+        var moex = new FakeMoexRepository
+        {
+            AllBondQuotes =
+            [
+                TestData.Quote("A", 100, 1.5m, assetClass: AssetClass.Bond),
+                TestData.Quote("B", 100, 5.0m, assetClass: AssetClass.Bond),
+                TestData.Quote("C", 100, 3.0m, assetClass: AssetClass.Bond),
+                TestData.Quote("D", 100, null, assetClass: AssetClass.Bond), // без торгов — не участвует
+            ]
+        };
+        var service = Service(moex, new FakeCacheRepository());
+
+        var gainers = await service.GetTopBondGainersAsync(2);
+        var losers = await service.GetTopBondLosersAsync(2);
+
+        Assert.Equal(["B", "C"], gainers.Select(q => q.Ticker).ToArray());
+        Assert.Equal(["A", "C"], losers.Select(q => q.Ticker).ToArray());
+        Assert.Equal(1, moex.AllBondsCalls); // список облигаций кэшируется между топами
+    }
 }
