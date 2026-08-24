@@ -22,15 +22,15 @@ public class ComparisonService : IComparisonService
     }
 
     public async Task<IReadOnlyList<InstrumentPerformance>> CompareInstrumentsAsync(
-        IReadOnlyList<string> tickers, DateTime from, DateTime to, CancellationToken ct = default)
+        IReadOnlyList<string> tickers, DateTime from, DateTime to, AssetClass assetClass = AssetClass.Share, CancellationToken ct = default)
     {
         var result = new List<InstrumentPerformance>();
 
         foreach (var raw in tickers.Distinct(StringComparer.OrdinalIgnoreCase))
         {
             var ticker = raw.ToUpperInvariant();
-            var start = await GetPriceAtAsync(ticker, from, ct);
-            var end = await GetPriceAtAsync(ticker, to, ct);
+            var start = await GetPriceAtAsync(ticker, from, assetClass, ct);
+            var end = await GetPriceAtAsync(ticker, to, assetClass, ct);
             if (start is null || end is null || start.Value.Price <= 0)
                 continue;
 
@@ -43,14 +43,15 @@ public class ComparisonService : IComparisonService
                 Math.Round(changePercent, 2),
                 start.Value.Time,
                 end.Value.Time,
-                end.Value.Source));
+                end.Value.Source,
+                assetClass));
         }
 
         return result.OrderByDescending(p => p.ChangePercent).ToList();
     }
 
     public async Task<IReadOnlyList<InstrumentPerformance>?> RankByPerformanceAsync(
-        DateTime from, DateTime to, int limit, CancellationToken ct = default)
+        DateTime from, DateTime to, int limit, AssetClass assetClass = AssetClass.Share, CancellationToken ct = default)
     {
         // Для ранжирования всего рынка по одному тикеру в историю не ходим — только снапшоты
         var startSnap = await _snapshots.GetNearestSnapshotAsync(from, ct);
@@ -62,11 +63,11 @@ public class ComparisonService : IComparisonService
             return null;
 
         var startPrices = startSnap.Quotes
-            .Where(q => q.Price is > 0)
+            .Where(q => q.Class == assetClass && q.Price is > 0)
             .ToDictionary(q => q.Ticker, q => q, StringComparer.OrdinalIgnoreCase);
 
         var result = new List<InstrumentPerformance>();
-        foreach (var endQuote in endSnap.Quotes.Where(q => q.Price is > 0))
+        foreach (var endQuote in endSnap.Quotes.Where(q => q.Class == assetClass && q.Price is > 0))
         {
             if (!startPrices.TryGetValue(endQuote.Ticker, out var startQuote))
                 continue;
@@ -80,7 +81,8 @@ public class ComparisonService : IComparisonService
                 Math.Round(changePercent, 2),
                 startSnap.TakenAt,
                 endSnap.TakenAt,
-                "snapshot"));
+                "snapshot",
+                assetClass));
         }
 
         return result.OrderByDescending(p => p.ChangePercent).Take(limit).ToList();
@@ -88,17 +90,18 @@ public class ComparisonService : IComparisonService
 
     /// <summary>Цена тикера на момент: снапшот (±1 сутки) либо последнее дневное закрытие не позже момента.</summary>
     private async Task<(decimal Price, DateTime Time, string Source, string Name)?> GetPriceAtAsync(
-        string ticker, DateTime moment, CancellationToken ct)
+        string ticker, DateTime moment, AssetClass assetClass, CancellationToken ct)
     {
         var snap = await _snapshots.GetNearestSnapshotAsync(moment, ct);
         if (snap is not null && (snap.TakenAt - moment).Duration() <= MaxSnapshotDistance)
         {
-            var quote = snap.Quotes.FirstOrDefault(q => q.Ticker.Equals(ticker, StringComparison.OrdinalIgnoreCase));
+            var quote = snap.Quotes.FirstOrDefault(q =>
+                q.Class == assetClass && q.Ticker.Equals(ticker, StringComparison.OrdinalIgnoreCase));
             if (quote?.Price is > 0)
                 return (quote.Price.Value, snap.TakenAt, "snapshot", quote.Name);
         }
 
-        var history = await _moex.GetPriceHistoryAsync(ticker, moment.AddDays(-10), moment, ct);
+        var history = await _moex.GetPriceHistoryAsync(ticker, moment.AddDays(-10), moment, assetClass, ct);
         var last = history.LastOrDefault();
         if (last is not null)
             return (last.Close, last.Date, "history", ticker);

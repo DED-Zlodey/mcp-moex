@@ -1,3 +1,5 @@
+using MoexMcp.Domain.Models;
+
 namespace MoexMcp.Application.Services;
 
 /// <summary>Доходность одного инструмента за период.</summary>
@@ -9,18 +11,23 @@ public record InstrumentPerformance(
     decimal ChangePercent,
     DateTime StartPriceTime,
     DateTime EndPriceTime,
-    string PriceSource);
+    string PriceSource,
+    AssetClass Class = AssetClass.Share);
 
 public interface IComparisonService
 {
-    /// <summary>Сравнить инструменты между собой по доходности за период (отсортированы по убыванию доходности).</summary>
+    /// <summary>
+    /// Сравнить инструменты между собой по доходности за период (отсортированы по убыванию доходности).
+    /// Класс актива единый на вызов — смешанное сравнение «акция vs облигация» не поддерживается
+    /// (у классов разные единицы цены).
+    /// </summary>
     Task<IReadOnlyList<InstrumentPerformance>> CompareInstrumentsAsync(
-        IReadOnlyList<string> tickers, DateTime from, DateTime to, CancellationToken ct = default);
+        IReadOnlyList<string> tickers, DateTime from, DateTime to, AssetClass assetClass = AssetClass.Share, CancellationToken ct = default);
 
     /// <summary>
-    /// Ранжировать все акции TQBR по доходности за период.
+    /// Ранжировать инструменты одного класса по доходности за период.
     /// Возвращает null, если подходящих снапшотов ещё нет (данные накапливаются воркером).
     /// </summary>
     Task<IReadOnlyList<InstrumentPerformance>?> RankByPerformanceAsync(
-        DateTime from, DateTime to, int limit, CancellationToken ct = default);
+        DateTime from, DateTime to, int limit, AssetClass assetClass = AssetClass.Share, CancellationToken ct = default);
 }

@@ -1,6 +1,29 @@
 namespace MoexMcp.Domain.Models;
 
-/// <summary>Котировка акции.</summary>
+/// <summary>Класс актива на MOEX.</summary>
+public enum AssetClass
+{
+    Share,
+    Bond,
+    Currency,
+    Metal
+}
+
+public static class AssetClassExtensions
+{
+    /// <summary>Единица измерения цены: акции/валюта — ₽, облигации — % от номинала, металлы — ₽/грамм.</summary>
+    public static string PriceUnit(this AssetClass assetClass) => assetClass switch
+    {
+        AssetClass.Bond => "% номинала",
+        AssetClass.Metal => "₽/г",
+        _ => "₽"
+    };
+}
+
+/// <summary>
+/// Котировка инструмента. Class по умолчанию Share — старые снапшоты в Redis
+/// десериализуются как акции (обратная совместимость).
+/// </summary>
 public record Quote(
     string Ticker,
     string Name,
@@ -8,7 +31,11 @@ public record Quote(
     decimal? Change,
     decimal? ChangePercent,
     long? Volume,
-    DateTime? Time);
+    DateTime? Time,
+    AssetClass Class = AssetClass.Share,
+    string? PriceUnit = null,
+    decimal? Yield = null,
+    decimal? AccruedInterest = null);
 
 /// <summary>OHLC-свеча.</summary>
 public record Candle(
@@ -29,6 +56,14 @@ public record IndexQuote(
 /// <summary>Курс валютной пары.</summary>
 public record CurrencyRate(
     string Ticker,
+    decimal? Price,
+    decimal? Change,
+    DateTime? Time);
+
+/// <summary>Цена драгметалла (GLDRUB_TOM, SLVRUB_TOM), ₽/грамм.</summary>
+public record MetalPrice(
+    string Ticker,
+    string Name,
     decimal? Price,
     decimal? Change,
     DateTime? Time);
