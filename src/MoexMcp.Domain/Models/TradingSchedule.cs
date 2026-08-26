@@ -6,12 +6,19 @@ namespace MoexMcp.Domain.Models;
 /// </summary>
 public static class TradingSchedule
 {
+    /// <summary>
+    /// Информация о московском часовом поясе, используемая для перевода UTC в московское время.
+    /// </summary>
     private static readonly TimeZoneInfo MoscowTz = GetMoscowTimeZone();
 
-    /// <summary>Текущее московское время.</summary>
+    /// <summary>
+    /// Текущее московское время.
+    /// </summary>
     public static DateTime MoscowNow => TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, MoscowTz);
 
-    /// <summary>Идут ли сейчас торги по классу актива (по московскому времени).</summary>
+    /// <summary>
+    /// Идут ли сейчас торги по классу актива (по московскому времени).
+    /// </summary>
     public static bool IsSessionActive(AssetClass assetClass, DateTime moscowNow)
     {
         if (moscowNow.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
@@ -30,10 +37,14 @@ public static class TradingSchedule
     }
 
     /// <summary>
-    /// Стоит ли воркеру опрашивать класс: окно сессии с запасом, без привязки к дню недели
-    /// (MOEX проводит доп. сессии в часть выходных — пропускать их нельзя).
-    /// Ночью (0:00–9:00 МСК) не опрашивается ничего: данные всё равно неизменны.
+    /// Определяет, стоит ли воркеру опрашивать указанный класс активов в заданный момент московского времени.
+    /// Проверка выполняется по торговому окну класса с запасом, без привязки к дню недели,
+    /// чтобы не пропустить дополнительные сессии MOEX в часть выходных.
+    /// Ночью (с 0:00 до 9:00 МСК) опрос не производится, так как данные неизменны.
     /// </summary>
+    /// <param name="assetClass">Класс актива MOEX.</param>
+    /// <param name="moscowNow">Текущее московское время.</param>
+    /// <returns>true, если класс активов находится в окне опроса; в противном случае — false.</returns>
     public static bool ShouldPoll(AssetClass assetClass, DateTime moscowNow)
     {
         var t = moscowNow.TimeOfDay;
@@ -45,7 +56,14 @@ public static class TradingSchedule
         };
     }
 
-    /// <summary>Строка статуса рынка для ответов инструментов.</summary>
+    /// <summary>
+    /// Формирует строку статуса рынка для ответов инструментов:
+    /// торги идут или вне сессии, с указанием времени данных.
+    /// </summary>
+    /// <param name="assetClass">Класс актива MOEX.</param>
+    /// <param name="dataTime">Время данных. Если не задано, выводится «н/д».</param>
+    /// <param name="moscowNow">Текущее московское время.</param>
+    /// <return>Строка статуса рынка с указанием времени данных.</return>
     public static string Describe(AssetClass assetClass, DateTime? dataTime, DateTime moscowNow)
     {
         var data = dataTime is null ? "н/д" : $"{dataTime:HH:mm:ss dd.MM}";
@@ -54,6 +72,13 @@ public static class TradingSchedule
             : $"Вне сессии, данные на {data}";
     }
 
+    /// <summary>
+    /// Возвращает объект часового пояса для московского времени, выбирая идентификатор,
+    /// доступный в текущей операционной системе.
+    /// </summary>
+    /// <returns>
+    /// Информация о московском часовом поясе.
+    /// </returns>
     private static TimeZoneInfo GetMoscowTimeZone()
     {
         // Windows и Linux используют разные идентификаторы зон

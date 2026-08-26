@@ -5,6 +5,12 @@ namespace MoexMcp.Tests.Application;
 
 public class HistoryServiceTests
 {
+    /// <summary>
+    /// Проверяет, что метод <see cref="HistoryService.GetCandlesAsync"/> выбрасывает исключение <see cref="ArgumentException"/>
+    /// при передаче неподдерживаемого значения интервала свечи.
+    /// </summary>
+    /// <param name="interval">Интервал свечи в минутах, который не входит в множество допустимых значений.</param>
+    /// <returns>Задача, представляющая результат выполнения асинхронного теста.</returns>
     [Theory]
     [InlineData(5)]
     [InlineData(15)]
@@ -17,6 +23,11 @@ public class HistoryServiceTests
             service.GetCandlesAsync("SBER", interval, DateTime.Today.AddDays(-1), DateTime.Today));
     }
 
+    /// <summary>
+    /// Проверяет, что запрос свечей с поддерживаемым интервалом корректно проходит через сервис истории и возвращает данные.
+    /// </summary>
+    /// <param name="interval">Интервал свечи в минутах, который должен поддерживаться сервисом.</param>
+    /// <returns>Задача, представляющая асинхронную операцию выполнения теста.</returns>
     [Theory]
     [InlineData(1)]
     [InlineData(10)]
@@ -35,6 +46,10 @@ public class HistoryServiceTests
         Assert.Single(candles);
     }
 
+    /// <summary>
+    /// Проверяет, что история цен кэшируется: повторный вызов получения истории по тому же тикеру и диапазону дат не приводит к повторному обращению к репозиторию MOEX.
+    /// </summary>
+    /// <return>Задача, представляющая асинхронную операцию выполнения теста.</return>
     [Fact]
     public async Task PriceHistory_IsCached()
     {
@@ -52,6 +67,12 @@ public class HistoryServiceTests
         Assert.Equal(1, moex.HistoryCalls);
     }
 
+    /// <summary>
+    /// Проверяет, что ключ кэширования истории цен включает класс актива, поэтому запросы с разными классами активов не попадают в один и тот же кэш.
+    /// </summary>
+    /// <return>
+    /// Задача, представляющая результат выполнения асинхронного теста.
+    /// </return>
     [Fact]
     public async Task CacheKeys_IncludeAssetClass()
     {
@@ -70,6 +91,11 @@ public class HistoryServiceTests
         Assert.Equal(2, moex.HistoryCalls);
     }
 
+    /// <summary>
+    /// Проверяет, что значение <see cref="AssetClass"/> корректно передаётся в репозиторий
+    /// при вызове методов получения свечей и истории цен.
+    /// </summary>
+    /// <returns>Задача, представляющая асинхронную операцию выполнения теста.</returns>
     [Fact]
     public async Task AssetClass_IsPassedToRepository()
     {

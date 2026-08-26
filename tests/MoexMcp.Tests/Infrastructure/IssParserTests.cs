@@ -5,8 +5,17 @@ namespace MoexMcp.Tests.Infrastructure;
 
 public class IssParserTests
 {
+    /// <summary>
+    /// Парсит строку JSON в объект <see cref="JsonDocument"/>.
+    /// </summary>
+    /// <param name="json">Строка, содержащая данные в формате JSON.</param>
+    /// <return>Разобранный документ JSON, готовый для чтения элементов.</return>
     private static JsonDocument Doc(string json) => JsonDocument.Parse(json);
 
+    /// <summary>
+    /// Проверяет, что метод <see cref="IssParser.ParseBlock"/> корректно сопоставляет
+    /// значения ячеек данных с именами столбцов в блоке ответа ISS.
+    /// </summary>
     [Fact]
     public void ParseBlock_MapsCellsByColumnNames()
     {
@@ -25,6 +34,10 @@ public class IssParserTests
         Assert.Equal(273.33m, row.GetDecimal("PREVPRICE"));
     }
 
+    /// <summary>
+    /// Проверяет, что метод <see cref="MoexMcp.Infrastructure.Moex.IssParser.ParseBlock"/> извлекает значения
+    /// по именам столбцов независимо от их порядка в массиве columns.
+    /// </summary>
     [Fact]
     public void ParseBlock_ColumnOrderDoesNotMatter()
     {
@@ -41,6 +54,10 @@ public class IssParserTests
         Assert.Equal(273.33m, row.GetDecimal("PREVPRICE"));
     }
 
+    /// <summary>
+    /// Проверяет, что метод <see cref="IssParser.ParseBlock"/> возвращает пустой список,
+    /// если запрашиваемый блок отсутствует в документе JSON.
+    /// </summary>
     [Fact]
     public void ParseBlock_MissingBlock_ReturnsEmpty()
     {
@@ -48,6 +65,10 @@ public class IssParserTests
         Assert.Empty(IssParser.ParseBlock(doc, "securities"));
     }
 
+    /// <summary>
+    /// Проверяет, что метод <see cref="IssParser.GetDecimal(IReadOnlyDictionary{string, JsonElement}, string)"/>
+    /// корректно обрабатывает отсутствующее значение, числовое значение и число, представленное строкой.
+    /// </summary>
     [Fact]
     public void GetDecimal_HandlesNullNumberAndString()
     {
@@ -62,6 +83,9 @@ public class IssParserTests
         Assert.Null(row.GetDecimal("MISSING"));
     }
 
+    /// <summary>
+    /// Проверяет, что метод <see cref="IssParser.GetLong"/> корректно разбирает целочисленное значение объёма из блока данных ISS.
+    /// </summary>
     [Fact]
     public void GetLong_ParsesVolume()
     {
@@ -70,6 +94,13 @@ public class IssParserTests
         Assert.Equal(4167119L, row.GetLong("V"));
     }
 
+    /// <summary>
+    /// Проверяет, что метод <see cref="IssParser.GetDateTime"/> корректно разбирает дату и время, представленные в формате ISS.
+    /// </summary>
+    /// <remarks>
+    /// Создаёт JSON-документ с блоком, содержащим столбец "T" и строку данных "2026-08-21 19:00:11",
+    /// после чего убеждается, что возвращаемое значение соответствует 21 августа 2026 года 19:00:11.
+    /// </remarks>
     [Fact]
     public void GetDateTime_ParsesIssFormat()
     {

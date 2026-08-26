@@ -6,17 +6,42 @@ using ModelContextProtocol.Server;
 
 namespace MoexMcp.Host.Tools;
 
-/// <summary>Сравнение инструментов и ранжирование по доходности (на основе снапшотов в Redis и истории ISS).</summary>
+/// <summary>
+/// Сравнение инструментов и ранжирование по доходности (дневная история ISS).
+/// </summary>
 [McpServerToolType]
 public class MoexCompareTools
 {
     private readonly IComparisonService _comparison;
 
+    /// <summary>
+    /// Набор инструментов MCP-сервера для сравнения финансовых инструментов Московской биржи.
+    /// </summary>
+    /// <remarks>
+    /// Позволяет сравнивать инструменты одного класса активов по доходности за выбранный период.
+    /// </remarks>
     public MoexCompareTools(IComparisonService comparison)
     {
         _comparison = comparison;
     }
 
+    /// <summary>
+    /// Сравнивает финансовые инструменты одного класса активов по доходности за указанный период.
+    /// </summary>
+    /// <param name="tickers">Тикеры инструментов через запятую, например SBER,GAZP,LKOH.</param>
+    /// <param name="from">Начало периода в формате yyyy-MM-dd. По умолчанию — 7 дней назад.</param>
+    /// <param name="to">Конец периода в формате yyyy-MM-dd. По умолчанию — текущая дата.</param>
+    /// <param name="asset_type">Тип актива: share, bond, currency, metal. Должен быть одинаковым для всех переданных тикеров. По умолчанию — share.</param>
+    /// <param name="ct">Токен отмены асинхронной операции.</param>
+    /// <returns>
+    /// Строка с таблицей сравнения инструментов, содержащей цены на начало и конец периода,
+    /// изменение в процентах и место каждого инструмента в рейтинге доходности.
+    /// Возвращает сообщение об ошибке, если указан неподдерживаемый класс активов,
+    /// отсутствуют тикеры или не удалось получить цены за выбранный период.
+    /// </returns>
+    /// <remarks>
+    /// Смешанное сравнение инструментов разных классов активов не поддерживается.
+    /// </remarks>
     [McpServerTool(Name = "compare_instruments"), Description("Сравнить инструменты одного класса между собой по доходности за период: цена на начало и конец, изменение в %, место в рейтинге. Смешанное сравнение разных классов (акция vs облигация) не поддерживается — сравнивайте отдельными вызовами")]
     public async Task<string> CompareInstruments(
         [Description("Тикеры через запятую (например SBER,GAZP,LKOH)")] string tickers,
@@ -43,7 +68,17 @@ public class MoexCompareTools
         return FormatRanking(result, $"Сравнение инструментов ({asset_type}, {fromDate:dd.MM.yyyy} — {toDate:dd.MM.yyyy}):");
     }
 
-    [McpServerTool(Name = "rank_by_performance"), Description("Ранжировать инструменты MOEX одного класса по доходности за период. Работает по накопленным снапшотам (хранятся 7 дней); снапшоты облигаций/металлов накапливаются с момента выкатки этой версии")]
+    /// <summary>
+    /// Ранжирует инструменты Московской биржи одного класса активов по доходности за указанный период.
+    /// Расчёт выполняется по дневным ценам закрытия ISS.
+    /// </summary>
+    /// <param name="from">Начало периода в формате yyyy-MM-dd. По умолчанию используется начало текущего дня.</param>
+    /// <param name="to">Конец периода в формате yyyy-MM-dd. По умолчанию используется текущий момент времени.</param>
+    /// <param name="limit">Максимальное количество позиций в рейтинге. По умолчанию 20.</param>
+    /// <param name="asset_type">Тип актива: share, bond, currency или metal. По умолчанию share.</param>
+    /// <param name="ct">Токен отмены операции.</param>
+    /// <returns>Строка с рейтингом инструментов по доходности или сообщение об ошибке.</returns>
+    [McpServerTool(Name = "rank_by_performance"), Description("Ранжировать инструменты MOEX одного класса по доходности за период. Считается по дневным закрытиям ISS: берётся последний торговый день не позже границ периода, глубина истории — годы")]
     public async Task<string> RankByPerformance(
         [Description("Начало периода, yyyy-MM-dd. По умолчанию начало сегодняшнего дня")] string? from = null,
         [Description("Конец периода, yyyy-MM-dd. По умолчанию сейчас")] string? to = null,
@@ -60,14 +95,19 @@ public class MoexCompareTools
 
         var result = await _comparison.RankByPerformanceAsync(fromDate, toDate, limit, assetClass.Value, ct);
         if (result is null)
-            return "Нет подходящих снапшотов за этот период. Снапшоты рынка накапливаются каждые 5 минут и хранятся 7 дней — " +
-                   "для более ранних дат используйте compare_instruments (берёт данные из дневной истории ISS).";
+            return "Не удалось получить дневную историю ISS за этот период — попробуйте позже или другие даты.";
         if (result.Count == 0)
             return "Не удалось рассчитать доходность: нет цен за этот период.";
 
         return FormatRanking(result, $"Рейтинг ({asset_type}) по доходности ({fromDate:dd.MM.yyyy} — {toDate:dd.MM.yyyy}):");
     }
 
+    /// <summary>
+    /// Формирует текстовый рейтинг инструментов по доходности на основе переданных данных.
+    /// </summary>
+    /// <param name="items">Список объектов <see cref="InstrumentPerformance"/>, отсортированных по доходности, для форматирования.</param>
+    /// <param name="header">Заголовок, который добавляется в начало результирующей строки.</param>
+    /// <returns>Строка с заголовком и пронумерованным списком инструментов, включающим начальную и конечную цены, единицу измерения и процент изменения.</returns>
     private static string FormatRanking(IReadOnlyList<InstrumentPerformance> items, string header)
     {
         var sb = new StringBuilder(header + "\n");

@@ -5,12 +5,25 @@ namespace MoexMcp.Tests.Domain;
 
 public class QuoteSerializationTests
 {
+    /// <summary>
+    /// Параметры сериализации JSON, используемые в тестах для проверки десериализации котировок
+    /// и круговой сериализации объектов <see cref="Quote"/>.
+    /// Настроены с применением веб-умолчаний (<see cref="JsonSerializerDefaults.Web"/>),
+    /// что обеспечивает согласованное поведение при разборе данных в формате camelCase,
+    /// поддержку устаревших снапшотов без полей Class, PriceUnit, Yield и AccruedInterest
+    /// и сохранение полноценных bond-полей при сериализации и десериализации.
+    /// </summary>
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
+    /// <summary>
+    /// Проверяет десериализацию старого формата JSON котировок, который не содержит полей Class, PriceUnit, Yield и AccruedInterest.
+    /// Убеждается, что создаётся объект <see cref="Quote"/> с классом актива <see cref="AssetClass.Share"/> по умолчанию,
+    /// а отсутствующие поля PriceUnit, Yield и AccruedInterest имеют значение null, что обеспечивает обратную совместимость.
+    /// </summary>
     [Fact]
-    public void OldSnapshotJson_DeserializesAsShare()
+    public void OldQuoteJson_DeserializesAsShare()
     {
-        // Формат снапшотов Redis до появления классов активов — без Class/PriceUnit/Yield/AccruedInterest
+        // Формат котировок до появления классов активов — без Class/PriceUnit/Yield/AccruedInterest
         const string oldJson = """
             [{"ticker":"SBER","name":"Сбербанк","price":271.44,"change":-1.89,"changePercent":-0.69,"volume":4167119,"time":"2026-08-21T16:10:15"}]
             """;
@@ -26,6 +39,11 @@ public class QuoteSerializationTests
         Assert.Null(q.AccruedInterest);
     }
 
+    /// <summary>
+    /// Проверяет корректную круговую сериализацию котировки облигации
+    /// с сохранением специфичных полей: класса актива <see cref="AssetClass.Bond"/>,
+    /// единицы измерения цены, доходности и накопленного купонного дохода.
+    /// </summary>
     [Fact]
     public void NewQuote_RoundTrips_BondFields()
     {
