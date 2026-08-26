@@ -1,17 +1,36 @@
 namespace MoexMcp.Domain.Models;
 
-/// <summary>Класс актива на MOEX.</summary>
+/// <summary>
+/// Класс актива на MOEX.
+/// </summary>
 public enum AssetClass
 {
+    /// <summary>
+    /// Акция.
+    /// </summary>
     Share,
+
+    /// <summary>
+    /// Облигация.
+    /// </summary>
     Bond,
+
+    /// <summary>
+    /// Валюта.
+    /// </summary>
     Currency,
+
+    /// <summary>
+    /// Металлы.
+    /// </summary>
     Metal
 }
 
 public static class AssetClassExtensions
 {
-    /// <summary>Единица измерения цены: акции/валюта — ₽, облигации — % от номинала, металлы — ₽/грамм.</summary>
+    /// <summary>
+    /// Единица измерения цены: акции/валюта — ₽, облигации — % от номинала, металлы — ₽/грамм.
+    /// </summary>
     public static string PriceUnit(this AssetClass assetClass) => assetClass switch
     {
         AssetClass.Bond => "% номинала",
@@ -21,8 +40,8 @@ public static class AssetClassExtensions
 }
 
 /// <summary>
-/// Котировка инструмента. Class по умолчанию Share — старые снапшоты в Redis
-/// десериализуются как акции (обратная совместимость).
+/// Котировка инструмента. Class по умолчанию Share — снапшоты старого формата
+/// (без Class/PriceUnit/Yield/AccruedInterest) десериализуются как акции (обратная совместимость).
 /// </summary>
 public record Quote(
     string Ticker,
@@ -37,7 +56,9 @@ public record Quote(
     decimal? Yield = null,
     decimal? AccruedInterest = null);
 
-/// <summary>OHLC-свеча.</summary>
+/// <summary>
+/// OHLC-свеча.
+/// </summary>
 public record Candle(
     DateTime Begin,
     decimal Open,
@@ -46,21 +67,27 @@ public record Candle(
     decimal Low,
     long Volume);
 
-/// <summary>Значение индекса (IMOEX, RTSI и т.п.).</summary>
+/// <summary>
+/// Значение индекса (IMOEX, RTSI и т.п.).
+/// </summary>
 public record IndexQuote(
     string Ticker,
     decimal? Value,
     decimal? Change,
     DateTime? Time);
 
-/// <summary>Курс валютной пары.</summary>
+/// <summary>
+/// Курс валютной пары.
+/// </summary>
 public record CurrencyRate(
     string Ticker,
     decimal? Price,
     decimal? Change,
     DateTime? Time);
 
-/// <summary>Цена драгметалла (GLDRUB_TOM, SLVRUB_TOM), ₽/грамм.</summary>
+/// <summary>
+/// Цена драгметалла (GLDRUB_TOM, SLVRUB_TOM), ₽/грамм.
+/// </summary>
 public record MetalPrice(
     string Ticker,
     string Name,
@@ -68,26 +95,27 @@ public record MetalPrice(
     decimal? Change,
     DateTime? Time);
 
-/// <summary>Новость с сайта MOEX.</summary>
+/// <summary>
+/// Новость с сайта MOEX.
+/// </summary>
 public record SiteNewsItem(
     long Id,
     string Title,
     string Tag,
     DateTime? PublishedAt);
 
-/// <summary>Краткое описание ценной бумаги (для поиска).</summary>
+/// <summary>
+/// Краткое описание ценной бумаги (для поиска).
+/// </summary>
 public record SecurityInfo(
     string Ticker,
     string ShortName,
     string Name);
 
-/// <summary>Дневная цена закрытия.</summary>
+/// <summary>
+/// Дневная цена закрытия.
+/// </summary>
 public record DailyPrice(
     string Ticker,
     DateTime Date,
     decimal Close);
-
-/// <summary>Снапшот рынка: котировки всех акций на момент времени.</summary>
-public record MarketSnapshot(
-    DateTime TakenAt,
-    IReadOnlyList<Quote> Quotes);

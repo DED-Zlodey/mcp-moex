@@ -1,8 +1,8 @@
 using MoexMcp.Application.Services;
 using MoexMcp.Domain.Repositories;
+using MoexMcp.Infrastructure.Cache;
 using MoexMcp.Infrastructure.Moex;
 using MoexMcp.Infrastructure.Redis;
-using MoexMcp.Infrastructure.Snapshots;
 using Serilog;
 using StackExchange.Redis;
 
@@ -16,7 +16,7 @@ builder.Host.UseSerilog((ctx, _, cfg) => cfg
     .WriteTo.Seq(seqUrl));
 
 var issBaseUrl = builder.Configuration["Moex:BaseUrl"] ?? "https://iss.moex.com/iss";
-var redisConn = builder.Configuration["Redis:ConnectionString"] ?? "localhost:6379";
+var redisConn = builder.Configuration["Redis:ConnectionString"];
 
 // Infrastructure
 builder.Services.AddHttpClient<IMoexRepository, MoexRepository>(client =>
@@ -24,24 +24,21 @@ builder.Services.AddHttpClient<IMoexRepository, MoexRepository>(client =>
     client.BaseAddress = new Uri(issBaseUrl.TrimEnd('/'));
     client.Timeout = TimeSpan.FromSeconds(15);
 });
-builder.Services.AddSingleton<IConnectionMultiplexer>(_ => ConnectionMultiplexer.Connect(redisConn));
-builder.Services.AddSingleton<ICacheRepository, RedisCacheRepository>();
-builder.Services.AddSingleton<ISnapshotRepository, RedisSnapshotRepository>();
+// Redis опционален — только как быстрый TTL-кэш; без строки подключения кэш in-memory
+if (!string.IsNullOrWhiteSpace(redisConn))
+{
+    builder.Services.AddSingleton<IConnectionMultiplexer>(_ => ConnectionMultiplexer.Connect(redisConn));
+    builder.Services.AddSingleton<ICacheRepository, RedisCacheRepository>();
+}
+else
+{
+    builder.Services.AddSingleton<ICacheRepository, MemoryCacheRepository>();
+}
 
 // Application
 builder.Services.AddSingleton<IMarketDataService, MarketDataService>();
 builder.Services.AddSingleton<IHistoryService, HistoryService>();
 builder.Services.AddSingleton<IComparisonService, ComparisonService>();
-
-// Воркер снапшотов
-var snapshotInterval = TimeSpan.FromMinutes(builder.Configuration.GetValue("Snapshots:IntervalMinutes", 5));
-var snapshotRetention = TimeSpan.FromDays(builder.Configuration.GetValue("Snapshots:RetentionDays", 7));
-builder.Services.AddHostedService(sp => new MarketSnapshotWorker(
-    sp.GetRequiredService<IMoexRepository>(),
-    sp.GetRequiredService<ISnapshotRepository>(),
-    sp.GetRequiredService<ILogger<MarketSnapshotWorker>>(),
-    snapshotInterval,
-    snapshotRetention));
 
 // MCP-сервер (HTTP-транспорт)
 builder.Services.AddMcpServer()

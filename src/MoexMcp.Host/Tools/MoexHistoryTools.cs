@@ -6,17 +6,32 @@ using ModelContextProtocol.Server;
 
 namespace MoexMcp.Host.Tools;
 
-/// <summary>Исторические данные MOEX: свечи и дневная история (доступны круглосуточно, не зависят от сессии).</summary>
+/// <summary>
+/// Исторические данные MOEX: свечи и дневная история (доступны круглосуточно, не зависят от сессии).
+/// </summary>
 [McpServerToolType]
 public class MoexHistoryTools
 {
     private readonly IHistoryService _history;
 
+    /// <summary>
+    /// Инструменты MCP-сервера для получения исторических биржевых данных.
+    /// </summary>
     public MoexHistoryTools(IHistoryService history)
     {
         _history = history;
     }
 
+    /// <summary>
+    /// Получает OHLC-свечи указанного инструмента за заданный период.
+    /// </summary>
+    /// <param name="ticker">Тикер инструмента (например SBER или SU26243RMFS4).</param>
+    /// <param name="interval">Интервал свечи в минутах: 1, 10, 60 (час) или 24 (день). По умолчанию 60.</param>
+    /// <param name="from">Начало периода в формате yyyy-MM-dd. По умолчанию 7 дней назад.</param>
+    /// <param name="to">Конец периода в формате yyyy-MM-dd. По умолчанию сегодня.</param>
+    /// <param name="asset_type">Тип актива: share, bond, currency, metal. По умолчанию share.</param>
+    /// <param name="ct">Токен отмены операции.</param>
+    /// <return>Строка с таблицей свечей или сообщение об ошибке.</return>
     [McpServerTool(Name = "get_candles"), Description("Получить OHLC-свечи инструмента: открытие, закрытие, максимум, минимум, объём")]
     public async Task<string> GetCandles(
         [Description("Тикер инструмента (например SBER или SU26243RMFS4)")] string ticker,
@@ -53,6 +68,15 @@ public class MoexHistoryTools
         return sb.ToString();
     }
 
+    /// <summary>
+    /// Возвращает дневные цены закрытия указанного инструмента за заданный период.
+    /// </summary>
+    /// <param name="ticker">Тикер инструмента (например SBER или SU26243RMFS4).</param>
+    /// <param name="from">Начало периода в формате yyyy-MM-dd. По умолчанию используется дата 30 дней назад.</param>
+    /// <param name="to">Конец периода в формате yyyy-MM-dd. По умолчанию используется сегодняшняя дата.</param>
+    /// <param name="asset_type">Тип актива: share, bond, currency, metal. По умолчанию share.</param>
+    /// <param name="ct">Токен отмены асинхронной операции.</param>
+    /// <returns>Строка с историей цен закрытия инструмента или сообщение об отсутствии данных или некорректном типе актива.</returns>
     [McpServerTool(Name = "get_price_history"), Description("Получить дневные цены закрытия инструмента за период")]
     public async Task<string> GetPriceHistory(
         [Description("Тикер инструмента (например SBER или SU26243RMFS4)")] string ticker,

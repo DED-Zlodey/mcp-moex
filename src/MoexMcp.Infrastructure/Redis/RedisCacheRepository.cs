@@ -5,16 +5,42 @@ using StackExchange.Redis;
 
 namespace MoexMcp.Infrastructure.Redis;
 
-/// <summary>TTL-кэш на Redis. Все ключи с префиксом moexmcp:, чтобы не пересекаться с чужими данными.</summary>
+/// <summary>
+/// TTL-кэш на Redis. Все ключи с префиксом moexmcp:, чтобы не пересекаться с чужими данными.
+/// </summary>
 public class RedisCacheRepository : ICacheRepository
 {
+    /// <summary>
+    /// Префикс, добавляемый ко всем ключам кэша в Redis.
+    /// Все ключи формируются с префиксом <c>moexmcp:cache:</c>,
+    /// чтобы изолировать данные приложения от чужих данных в общем хранилище
+    /// и избежать случайных коллизий имён.
+    /// </summary>
     private const string KeyPrefix = "moexmcp:cache:";
 
+    /// <summary>
+    /// Параметры сериализации и десериализации JSON, используемые при записи и чтении значений из кэша Redis.
+    /// Инициализируются веб-умолчаниями для обеспечения согласованного формата ключей JSON.
+    /// </summary>
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
+    /// <summary>
+    /// Экземпляр базы данных Redis, используемый для выполнения операций чтения и записи кэша.
+    /// </summary>
     private readonly IDatabase _db;
+
+    /// <summary>
+    /// Логгер для регистрации предупреждений и ошибок, возникающих при работе с кэшем Redis.
+    /// </summary>
     private readonly ILogger<RedisCacheRepository> _logger;
 
+    /// <summary>
+    /// Репозиторий TTL-кэша на основе Redis.
+    /// Все ключи автоматически дополняются префиксом moexmcp:, чтобы исключить
+    /// пересечение с данными других приложений.
+    /// При ошибках чтения или записи выполняется логирование, а операция
+    /// продолжается как при отсутствии кэша.
+    /// </summary>
     public RedisCacheRepository(IConnectionMultiplexer redis, ILogger<RedisCacheRepository> logger)
     {
         _db = redis.GetDatabase();
