@@ -9,11 +9,12 @@ using StackExchange.Redis;
 var builder = WebApplication.CreateBuilder(args);
 
 var seqUrl = builder.Configuration["Seq:Url"] ?? "http://localhost:5341";
+var seqApiKey = builder.Configuration["Seq:ApiKey"];
 builder.Host.UseSerilog((ctx, _, cfg) => cfg
     .ReadFrom.Configuration(ctx.Configuration)
     .Enrich.FromLogContext()
     .WriteTo.Console()
-    .WriteTo.Seq(seqUrl));
+    .WriteTo.Seq(seqUrl, apiKey: seqApiKey));
 
 var issBaseUrl = builder.Configuration["Moex:BaseUrl"] ?? "https://iss.moex.com/iss";
 var redisConn = builder.Configuration["Redis:ConnectionString"];
