@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Globalization;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using MoexMcp.Application.Services;
@@ -50,7 +51,7 @@ public class MoexMarketTools
         var sb = new StringBuilder($"Информация об акции {quote.Ticker} ({quote.Name}):\n");
         sb.AppendLine($"Цена: {Format.Price(quote.Price, quote.PriceUnit)}");
         sb.AppendLine($"Изменение: {Format.Signed(quote.Change)} ({Format.Signed(quote.ChangePercent)}%)");
-        sb.AppendLine($"Объём торгов: {quote.Volume?.ToString("N0") ?? "н/д"}");
+        sb.AppendLine($"Объём торгов: {Format.Integer(quote.Volume)}");
         sb.AppendLine($"Время данных (МСК): {Format.Time(quote.Time)}");
         sb.AppendLine(MarketStatus(AssetClass.Share, quote.Time));
         return sb.ToString();
@@ -73,10 +74,10 @@ public class MoexMarketTools
 
         var sb = new StringBuilder($"Информация об облигации {quote.Ticker} ({quote.Name}):\n");
         sb.AppendLine($"Цена: {Format.Price(quote.Price, quote.PriceUnit)}");
-        sb.AppendLine($"Доходность (YTM): {(quote.Yield is null ? "н/д" : $"{quote.Yield:0.00}%")}");
+        sb.AppendLine($"Доходность (YTM): {Format.Percent(quote.Yield)}");
         sb.AppendLine($"НКД: {Format.Price(quote.AccruedInterest)}");
         sb.AppendLine($"Изменение: {Format.Signed(quote.Change)} ({Format.Signed(quote.ChangePercent)}%)");
-        sb.AppendLine($"Объём торгов: {quote.Volume?.ToString("N0") ?? "н/д"}");
+        sb.AppendLine($"Объём торгов: {Format.Integer(quote.Volume)}");
         sb.AppendLine($"Время данных (МСК): {Format.Time(quote.Time)}");
         sb.AppendLine(MarketStatus(AssetClass.Bond, quote.Time));
         return sb.ToString();
@@ -284,33 +285,52 @@ public class MoexMarketTools
 internal static class Format
 {
     /// <summary>
+    /// Русская культура для стабильного форматирования чисел независимо от локали сервера.
+    /// </summary>
+    private static readonly CultureInfo RuCulture = CultureInfo.GetCultureInfo("ru-RU");
+
+    /// <summary>
     /// Форматирует ценовое значение в виде строки с указанием единицы измерения.
     /// </summary>
     /// <param name="value">Ценовое значение для форматирования.</param>
     /// <param name="unit">Единица измерения цены (например, валюта); если не указана, используется рубль.</param>
     /// <returns>Строковое представление цены с единицей измерения или "н/д", если значение отсутствует.</returns>
-    public static string Price(decimal? value, string? unit = null) => value is null ? "н/д" : $"{value:0.00} {unit ?? "₽"}";
+    public static string Price(decimal? value, string? unit = null) => value is null ? "н/д" : string.Format(RuCulture, "{0:0.00} {1}", value, unit ?? "₽");
 
     /// <summary>
     /// Форматирует числовое значение в строковое представление с двумя знаками после запятой.
     /// </summary>
     /// <param name="value">Числовое значение для форматирования.</param>
     /// <returns>Строка с числом, округлённым до двух десятичных знаков; если значение равно null, возвращается «н/д».</returns>
-    public static string Number(decimal? value) => value is null ? "н/д" : $"{value:0.00}";
+    public static string Number(decimal? value) => value is null ? "н/д" : string.Format(RuCulture, "{0:0.00}", value);
+
+    /// <summary>
+    /// Форматирует процентное значение с двумя знаками после запятой и знаком процента.
+    /// </summary>
+    /// <param name="value">Процентное значение для форматирования.</param>
+    /// <returns>Строка с числом и знаком процента; если значение равно null, возвращается «н/д».</returns>
+    public static string Percent(decimal? value) => value is null ? "н/д" : string.Format(RuCulture, "{0:0.00}%", value);
+
+    /// <summary>
+    /// Форматирует целое число с разделителями разрядов.
+    /// </summary>
+    /// <param name="value">Целочисленное значение для форматирования.</param>
+    /// <returns>Строка с разделителями тысяч; если значение равно null, возвращается «н/д».</returns>
+    public static string Integer(long? value) => value is null ? "н/д" : string.Format(RuCulture, "{0:N0}", value);
 
     /// <summary>
     /// Форматирует числовое значение как строку со знаком: «+» для неотрицательных значений и «−» для отрицательных.
     /// </summary>
     /// <param name="value">Числовое значение для форматирования. Если значение равно null, возвращается строка «н/д».</param>
     /// <returns>Строковое представление числа со знаком или строка «н/д», если значение отсутствует.</returns>
-    public static string Signed(decimal? value) => value is null ? "н/д" : $"{(value >= 0 ? "+" : "")}{value:0.00}";
+    public static string Signed(decimal? value) => value is null ? "н/д" : string.Format(RuCulture, "{0}{1:0.00}", value >= 0 ? "+" : "", value);
 
     /// <summary>
     /// Форматирует значение даты и времени в строку.
     /// </summary>
     /// <param name="value">Значение даты и времени для форматирования.</param>
     /// <returns>Строковое представление даты и времени в формате "dd.MM.yyyy HH:mm:ss" или "н/д", если значение не задано.</returns>
-    public static string Time(DateTime? value) => value is null ? "н/д" : $"{value:dd.MM.yyyy HH:mm:ss}";
+    public static string Time(DateTime? value) => value is null ? "н/д" : string.Format(RuCulture, "{0:dd.MM.yyyy HH:mm:ss}", value);
 
     /// <summary>
     /// Разбирает дату из строки или возвращает значение по умолчанию, если строка пустая либо не может быть распознана как дата.

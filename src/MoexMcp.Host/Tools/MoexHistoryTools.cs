@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Globalization;
 using System.Text;
 using MoexMcp.Application.Services;
 using MoexMcp.Domain.Models;
@@ -61,10 +62,11 @@ public class MoexHistoryTools
         if (candles.Count == 0)
             return $"Свечей по {ticker} за {fromDate:dd.MM.yyyy}—{toDate:dd.MM.yyyy} не найдено.";
 
+        var ru = CultureInfo.GetCultureInfo("ru-RU");
         var sb = new StringBuilder($"Свечи {ticker.ToUpperInvariant()} ({asset_type}), интервал {interval} мин, {fromDate:dd.MM.yyyy}—{toDate:dd.MM.yyyy} ({candles.Count} шт.):\n");
         sb.AppendLine("Время | O | C | H | L | Объём");
         foreach (var c in candles)
-            sb.AppendLine($"{c.Begin:dd.MM HH:mm} | {c.Open:0.00} | {c.Close:0.00} | {c.High:0.00} | {c.Low:0.00} | {c.Volume}");
+            sb.AppendLine(string.Format(ru, "{0:dd.MM HH:mm} | {1:0.00} | {2:0.00} | {3:0.00} | {4:0.00} | {5}", c.Begin, c.Open, c.Close, c.High, c.Low, c.Volume));
         return sb.ToString();
     }
 
@@ -97,9 +99,10 @@ public class MoexHistoryTools
             return $"Истории по {ticker} за {fromDate:dd.MM.yyyy}—{toDate:dd.MM.yyyy} не найдено.";
 
         var unit = assetClass.Value.PriceUnit();
+        var ru = CultureInfo.GetCultureInfo("ru-RU");
         var sb = new StringBuilder($"История закрытий {ticker.ToUpperInvariant()} ({asset_type}), {fromDate:dd.MM.yyyy}—{toDate:dd.MM.yyyy} ({prices.Count} дней):\n");
         foreach (var p in prices)
-            sb.AppendLine($"{p.Date:dd.MM.yyyy}: {p.Close:0.00} {unit}");
+            sb.AppendLine(string.Format(ru, "{0:dd.MM.yyyy}: {1:0.00} {2}", p.Date, p.Close, unit));
         return sb.ToString();
     }
 }

@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Globalization;
 using System.Text;
 using MoexMcp.Application.Services;
 using MoexMcp.Domain.Models;
@@ -110,12 +111,14 @@ public class MoexCompareTools
     /// <returns>Строка с заголовком и пронумерованным списком инструментов, включающим начальную и конечную цены, единицу измерения и процент изменения.</returns>
     private static string FormatRanking(IReadOnlyList<InstrumentPerformance> items, string header)
     {
+        var ru = CultureInfo.GetCultureInfo("ru-RU");
         var sb = new StringBuilder(header + "\n");
         for (var i = 0; i < items.Count; i++)
         {
             var p = items[i];
             var unit = p.Class.PriceUnit();
-            sb.AppendLine($"{i + 1}. {p.Ticker} ({p.Name}): {p.StartPrice:0.00} → {p.EndPrice:0.00} {unit}, {Format.Signed(p.ChangePercent)}%");
+            sb.AppendLine(string.Format(ru, "{0}. {1} ({2}): {3:0.00} → {4:0.00} {5}, {6}%",
+                i + 1, p.Ticker, p.Name, p.StartPrice, p.EndPrice, unit, Format.Signed(p.ChangePercent)));
         }
         return sb.ToString();
     }
